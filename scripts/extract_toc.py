@@ -26,7 +26,6 @@ def extract_toc_text(pdf_path, start_page, end_page):
 def parse_toc_lines(lines, doc_title):
     toc_entries = []
     section_re = re.compile(r'^(\d+(?:\.\d+)*)(?:\s+)(.+?)\s+(\d+)$')
-
     for line in lines:
         m = section_re.match(line.strip().replace("…", " "))
         if m:
@@ -35,7 +34,6 @@ def parse_toc_lines(lines, doc_title):
             page = int(m.group(3))
             level = sec_id.count(".") + 1
             parent_id = ".".join(sec_id.split(".")[:-1]) if "." in sec_id else None
-
             toc_entries.append({
                 "doc_title": doc_title,
                 "section_id": sec_id,
@@ -48,13 +46,11 @@ def parse_toc_lines(lines, doc_title):
     return toc_entries
 
 if __name__ == "__main__":
-    print(f"Reading TOC pages {TOC_START_PAGE}-{TOC_END_PAGE} from {PDF_PATH}")
     toc_lines = extract_toc_text(PDF_PATH, TOC_START_PAGE, TOC_END_PAGE)
     toc_entries = parse_toc_lines(toc_lines, DOC_TITLE)
-
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     print(f"Writing TOC to: {OUTPUT_FILE.resolve()}")
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for e in toc_entries:
             f.write(json.dumps(e) + "\n")
-    print(f"✅ TOC extracted: {len(toc_entries)} sections")
+    print(f"TOC extracted: {len(toc_entries)} sections")

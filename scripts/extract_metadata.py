@@ -22,8 +22,7 @@ def extract_metadata(pdf_path):
 
 if __name__ == "__main__":
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Writing Metadata to: {OUTPUT_FILE.resolve()}")
     meta = extract_metadata(PDF_PATH)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(json.dumps(meta) + "\n")
-    print(f"✅ Metadata extracted: {OUTPUT_FILE}")
+    print(f"Metadata extracted: {OUTPUT_FILE}")

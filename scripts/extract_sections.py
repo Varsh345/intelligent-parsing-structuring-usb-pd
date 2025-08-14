@@ -32,25 +32,18 @@ def extract_sections(pdf_path, toc_entries):
             start_page = entry["page"] - 1
             end_page = toc_entries[idx + 1]["page"] - 1 if idx + 1 < total_sections else len(pdf.pages) - 1  # <- changed from -2 to -1
 
-            # Sanity check
             if start_page < 0:
                 start_page = 0
             if end_page >= len(pdf.pages):
                 end_page = len(pdf.pages) - 1
             if end_page < start_page:
-                # Instead of skipping, just process the start page
-                #print(f"⚠ Page range inverted for {entry['full_path']} — using only start page")
                 end_page = start_page
-
-            # Progress output
-            print(f"Processing {idx+1}/{total_sections}: {entry['full_path']} (pages {start_page+1}-{end_page+1})")
 
             content_lines = []
             for p in range(start_page, end_page + 1):
                 try:
                     page_text = pdf.pages[p].extract_text()
-                except Exception as e:
-                    print(f"⚠ Error reading page {p+1}: {e}")
+                except Exception:
                     page_text = ""
                 if page_text:
                     content_lines.append(page_text.lower())
@@ -70,10 +63,9 @@ def extract_sections(pdf_path, toc_entries):
 if __name__ == "__main__":
     toc_entries = load_toc(TOC_FILE)
     spec_entries = extract_sections(PDF_PATH, toc_entries)
-
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     print(f"Writing Sections to: {OUTPUT_FILE.resolve()}")
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for e in spec_entries:
             f.write(json.dumps(e) + "\n")
-    print(f"✅ Sections extracted with tags: {len(spec_entries)}")
+    print(f"Sections extracted with tags: {len(spec_entries)}")

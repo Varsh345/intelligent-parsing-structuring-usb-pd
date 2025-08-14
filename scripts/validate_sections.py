@@ -36,6 +36,5 @@ if __name__ == "__main__":
     spec_entries = load_jsonl(SPEC_FILE)
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Writing Validation Report to: {OUTPUT_FILE.resolve()}")
     write_validation_report(toc_entries, spec_entries, OUTPUT_FILE)
-    print(f"✅ Validation report saved: {OUTPUT_FILE}")
+    print(f"Validation report saved: {OUTPUT_FILE}")
