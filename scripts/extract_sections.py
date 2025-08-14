@@ -30,7 +30,7 @@ def extract_sections(pdf_path, toc_entries):
         total_sections = len(toc_entries)
         for idx, entry in enumerate(toc_entries):
             start_page = entry["page"] - 1
-            end_page = toc_entries[idx + 1]["page"] - 1 if idx + 1 < total_sections else len(pdf.pages) - 1  # <- changed from -2 to -1
+            end_page = toc_entries[idx + 1]["page"] - 1 if idx + 1 < total_sections else len(pdf.pages) - 1  
 
             if start_page < 0:
                 start_page = 0
