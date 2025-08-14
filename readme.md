@@ -49,6 +49,6 @@ This project is divided into four main modules:
 - Generates validation_report.xlsx for detailed analysis.
 
 ## Author
-Dhana Varshini S
-Final Year B.Tech Artificial Intelligence & Data Science
-@ Sri Shakthi Institute of Engineering and Technology
+Dhana Varshini S  
+Final Year B.Tech Artificial Intelligence & Data Science  
+@ Sri Shakthi Institute of Engineering and Technology  
