@@ -1,5 +1,6 @@
 from pathlib import Path
 import pdfplumber
+import logging
 
 class MetadataExtractor:
     """
@@ -22,9 +23,12 @@ class MetadataExtractor:
         try:
             with pdfplumber.open(self.pdf_path) as pdf:
                 first_page_text = pdf.pages[0].extract_text()
-        except Exception as e:
+        except FileNotFoundError as e:
+            logging.warning(f"File not found: {e}")
             first_page_text = ""
-            print(f"Warning: Failed to extract metadata text - {e}")
+        except Exception as e:
+            logging.warning(f"Failed to extract metadata from PDF: {e}")
+            first_page_text = ""
 
         return {
             "doc_title": self.doc_title,
