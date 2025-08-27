@@ -2,6 +2,7 @@ from pathlib import Path
 import pdfplumber
 import logging
 import re
+import json
 
 class MetadataExtractor:
     """
@@ -57,10 +58,9 @@ class MetadataExtractor:
             return {}
 
         # Extract metadata dynamically using regex
-        revision = self._find_pattern(first_page_text, r"Revision\s*([\d.]+)", default="Unknown")
-        version = self._find_pattern(first_page_text, r"Version\s*([\d.]+)", default="Unknown")
-        release_date = self._find_pattern(first_page_text, r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}", default="Unknown")
-
+        revision = self._find_pattern(first_page_text, r"Revision\s*:?\s*([\d.]+)", default="Unknown")
+        version = self._find_pattern(first_page_text, r"Version\s*:?\s*([\d.]+)", default="Unknown")
+        release_date = self._find_pattern(first_page_text, r"Release\s*Date\s*:?\s*([\d\-]+)", default="Unknown")
         metadata = {
             "doc_title": self.doc_title,
             "revision": revision,
@@ -85,3 +85,21 @@ class MetadataExtractor:
         missing = [field for field in self.REQUIRED_FIELDS if field not in metadata or not metadata[field]]
         if missing:
             logging.warning(f"Metadata is missing fields: {missing}")
+
+# Assuming MetadataExtractor class code is implemented above
+
+if __name__ == "__main__":
+    PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
+    PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
+    OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_metadata.json"
+
+    extractor = MetadataExtractor(PDF_PATH, "USB Power Delivery Specification Rev 3.2 V1.1 2024-10")
+    metadata = extractor.extract()
+
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Writing metadata to: {OUTPUT_FILE.resolve()}")
+
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2)
+
+    print("Metadata extraction complete.")

@@ -1,71 +1,155 @@
 from pathlib import Path
 import re
 import pdfplumber
+import json
+from typing import List, Optional, Generator
+from dataclasses import dataclass, asdict
 
 
-class TOCExtractor:
+@dataclass
+class TOCEntry:
     """
-    Extracts and parses the Table of Contents (TOC) from a USB PD specification PDF.
+    Represents a single TOC section.
+    """
+    doc_title: str
+    section_id: str
+    title: str
+    page: int
+    level: int
+    parent_id: Optional[str]
+    full_path: str
 
-    Attributes:
-        pdf_path (Path): Path to the PDF file.
-        doc_title (str): Document title for the TOC entries.
+
+class PDFReader:
+    """
+    Reads text lines from a PDF efficiently using pdfplumber.
     """
 
-    TOC_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s+(.+?)\s+(\d+)$")
-
-    def __init__(self, pdf_path: Path, doc_title: str):
+    def __init__(self, pdf_path: Path):
         self.pdf_path = pdf_path
-        self.doc_title = doc_title
 
-    def extract(self, start_page: int, end_page: int):
+    def extract_lines(self, start_page: int = 1, end_page: Optional[int] = None) -> Generator[str, None, None]:
         """
-        Extracts TOC entries as a list of dictionaries, each representing a TOC record.
+        Extract lines of text from the PDF pages.
 
         Args:
-            start_page (int): 1-based first page number of the TOC in the PDF.
-            end_page (int): 1-based last page number of the TOC.
-
-        Returns:
-            List[dict]: List of TOC entry dicts with keys:
-                        'doc_title', 'section_id', 'title', 'page', 
-                        'level', 'parent_id', 'full_path'.
+            start_page: 1-based start page.
+            end_page: 1-based end page.
         """
-        toc_lines = self._extract_text_lines(start_page, end_page)
-        toc_entries = self._parse_toc_lines(toc_lines)
-        return toc_entries
+        try:
+            with pdfplumber.open(self.pdf_path) as pdf:
+                pages = pdf.pages[start_page - 1:end_page]
+                for page in pages:
+                    text = page.extract_text() or ""
+                    for line in text.split("\n"):
+                        line = line.strip()
+                        if line:
+                            yield line
+        except FileNotFoundError:
+            print(f"Error: PDF file not found at path {self.pdf_path}")
+            return
+        except Exception as e:
+            print(f"Error reading PDF file: {e}")
+            return
 
-    def _extract_text_lines(self, start_page: int, end_page: int):
-        """Extract non-empty text lines from specified PDF pages."""
-        lines = []
-        with pdfplumber.open(self.pdf_path) as pdf:
-            for page_num in range(start_page - 1, end_page):
-                page_text = pdf.pages[page_num].extract_text() or ""
-                page_lines = [line.strip() for line in page_text.split("\n") if line.strip()]
-                lines.extend(page_lines)
-        return lines
+class TOCParser:
+    """
+    Parses PDF lines into structured TOC entries.
+    """
+    TOC_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s+(.+?)\s+(\d+)$", re.UNICODE)
 
-    def _parse_toc_lines(self, lines):
-        """Parse TOC lines using regex pattern and return structured entries."""
-        entries = []
+    def __init__(self, doc_title: str):
+        self.doc_title = doc_title
+
+    @staticmethod
+    def clean_line(line: str) -> str:
+        """
+        Clean PDF line: remove 'PageXX' artifacts and extra spacing.
+        Args:- line: Raw PDF line.
+        Returns: Cleaned line.
+        """
+        line = line.replace("…", " ")
+        line = re.sub(r'\s*P\s*a\s*g\s*e\s*\d+', '', line, flags=re.IGNORECASE)
+        line = re.sub(r'\s+', ' ', line).strip()
+        return line
+
+    @staticmethod
+    def clean_title(title: str) -> str:
+        """
+        Fix garbled titles, remove extra dots/spaces.
+        Args: Raw title string.
+        Returns: Clean title.
+        """
+        title = re.sub(r'[\s.]+', ' ', title).strip()
+        title = re.sub(r'\b(\w)\s(?=\w\b)', r'\1', title) 
+        return title
+
+    def parse_lines(self, lines: List[str]) -> List[TOCEntry]:
+        """
+        Parse cleaned lines into TOCEntry objects.
+
+        Args: List of PDF text lines.
+
+        Returns: Parsed TOC entries.
+        """
+        entries: List[TOCEntry] = []
+
         for line in lines:
-            #Replace dots with space for consistent parsing
-            normalized_line = line.replace("…", " ")
-            match = self.TOC_PATTERN.match(normalized_line)
-            if match:
-                section_id, title, page_str = match.groups()
-                #Clean up trailing dots in title
-                clean_title = re.sub(r"\.{2,}", "", title).strip()
-                entry = {
-                    "doc_title": self.doc_title,
-                    "section_id": section_id,
-                    "title": clean_title,
-                    "page": int(page_str),
-                    "level": section_id.count(".") + 1,
-                    "parent_id": (
-                        ".".join(section_id.split(".")[:-1]) if "." in section_id else None
-                    ),
-                    "full_path": f"{section_id} {clean_title}",
-                }
-                entries.append(entry)
+            normalized = self.clean_line(line)
+            match = self.TOC_PATTERN.match(normalized)
+            if not match:
+                continue
+
+            section_id, title, page_str = match.groups()
+            clean_title = self.clean_title(title)
+            parts = section_id.split(".")
+            parent_id = ".".join(parts[:-1]) if len(parts) > 1 else None
+
+            entries.append(
+                TOCEntry(
+                    doc_title=self.doc_title,
+                    section_id=section_id,
+                    title=clean_title,
+                    page=int(page_str),
+                    level=len(parts),
+                    parent_id=parent_id,
+                    full_path=f"{section_id} {clean_title}"
+                )
+            )
+
         return entries
+
+def save_jsonl(entries: List[TOCEntry], output_file: Path):
+    """
+    Save TOC entries as JSONL.
+
+    Args:
+        entries: TOC entries.
+        output_file: Output file path.
+    """
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    with output_file.open("w", encoding="utf-8") as f:
+        for entry in entries:
+            f.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")
+
+if __name__ == "__main__":
+    # --- Paths ---
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
+    OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_toc.jsonl"
+
+    #TOC page range
+    TOC_START_PAGE = 13
+    TOC_END_PAGE = 26
+
+    #Read only TOC pages
+    pdf_reader = PDFReader(PDF_PATH)
+    toc_lines = list(pdf_reader.extract_lines(start_page=TOC_START_PAGE, end_page=TOC_END_PAGE))
+
+    #Parse TOC entries
+    toc_parser = TOCParser("USB Power Delivery Specification Rev 3.2 V1.1 2024-10")
+    toc_entries = toc_parser.parse_lines(toc_lines)
+
+    #Save JSONL
+    save_jsonl(toc_entries, OUTPUT_FILE)
+
