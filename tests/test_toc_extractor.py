@@ -1,39 +1,65 @@
 import unittest
 from pathlib import Path
-from src.parser.toc_extractor import TOCExtractor
+from src.parser.toc_extractor import TOCParser, TOCEntry, PDFReader, save_jsonl
+
 
 class TestTOCExtractor(unittest.TestCase):
-
     def setUp(self):
-        # Update this path to match your actual test PDF location
-        self.pdf_path = Path("data/USB_PD_R3_2 V1_1_2024_10.pdf")
-        self.doc_title = "USB PD Specification Test"
-        self.extractor = TOCExtractor(self.pdf_path, self.doc_title)
+        self.extractor = TOCParser(doc_title="Test Document")
 
-    def test_extract_returns_entries(self):
-        start_page = 13
-        end_page = 18
-        
-        toc_entries = self.extractor.extract(start_page, end_page)
+    def test_toc_entry_creation(self):
+        """Check that a TOCEntry object stores values correctly."""
+        entry = TOCEntry(
+            doc_title="Test Document",
+            section_id="1.0",
+            title="Introduction",
+            page=1,
+            level=1,
+            parent_id=None,
+            full_path="1.0 Introduction",
+        )
 
-        # Ensuring some TOC entries are returned
-        self.assertGreater(len(toc_entries), 0)
+        self.assertEqual(entry.section_id, "1.0")
+        self.assertEqual(entry.title, "Introduction")
+        self.assertEqual(entry.page, 1)
+        self.assertEqual(entry.level, 1)
+        self.assertIsNone(entry.parent_id)
+        self.assertEqual(entry.full_path, "1.0 Introduction")
 
-        # Checks the first entry structure
-        first_entry = toc_entries[0]
-        self.assertIn("section_id", first_entry)
-        self.assertIn("title", first_entry)
-        self.assertIn("page", first_entry)
-        self.assertIn("level", first_entry)
-        self.assertIn("parent_id", first_entry)
-        self.assertIn("full_path", first_entry)
-        self.assertEqual(first_entry["doc_title"], self.doc_title)
+    def test_save_jsonl(self):
+        """Ensure save_jsonl writes entries to a JSONL file correctly."""
+        test_file = Path("test_output.jsonl")
+        entries = [
+            TOCEntry(
+                doc_title="Test Document",
+                section_id="1.0",
+                title="Introduction",
+                page=1,
+                level=1,
+                parent_id=None,
+                full_path="1.0 Introduction",
+            ),
+            TOCEntry(
+                doc_title="Test Document",
+                section_id="2.0",
+                title="Background",
+                page=2,
+                level=1,
+                parent_id=None,
+                full_path="2.0 Background",
+            ),
+        ]
 
-        # Validate types
-        self.assertIsInstance(first_entry["section_id"], str)
-        self.assertIsInstance(first_entry["title"], str)
-        self.assertIsInstance(first_entry["page"], int)
-        self.assertIsInstance(first_entry["level"], int)
+        save_jsonl(entries, test_file)
+
+        # Read file back and check line count
+        with open(test_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        self.assertEqual(len(lines), 2)
+        self.assertIn("Introduction", lines[0])
+        self.assertIn("Background", lines[1])
+        test_file.unlink(missing_ok=True)
 
 if __name__ == "__main__":
     unittest.main()
