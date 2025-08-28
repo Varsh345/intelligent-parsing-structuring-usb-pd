@@ -18,35 +18,56 @@ It extracts the Table of Contents (ToC), processes all document sections into st
 - Validates parsed data against the ToC for missing/mismatched sections, order errors, and page discrepancies.
 - Exports results in JSONL, JSON, and Excel formats.
 
+## Project Structure
+
+USB_PD_PARSERS/
+├── app.py                    # Main entry point to run parsing and validation
+├── data/                     # Place USB PD Specification PDF here
+├── output/                   # Outputs: JSON, JSONL, Excel files
+├── src/
+│   ├── parser/               # Parsing modules for metadata, sections, ToC
+│   ├── validator/            # Validation modules for section consistency
+│   └── __init__.py
+├── tests/                    # Unit tests using unittest framework
+├── requirements.txt          # Python dependencies
+├── readme.md                 # Project documentation
+└── .gitignore
+
 ## Installation & Setup
 1. Clone the repository and navigate to the project folder.
 2. Place the USB PD Specification PDF in the `data/` directory.
-3. Install dependencies:  " pip install -r requirements.txt "
-4. Run the parser: " python app.py "
-5. Check the output/ folder for generated files
+3. Create and activate a Python virtual environment. (If needed)
+4. Install dependencies:  " pip install -r requirements.txt "
+5. Run the parser and validator: " python app.py "
+6. Run unit test to verify parser and validator: 
+        "python -m unittest discover tests"
+7. Check the output/ folder for generated files
 
 ## Requirements
 - Python 3.x
 - pdfplumber
 - openpyxl
+- spacy
 
 ## Project Description
-This project is divided into four main modules:
-1. extract_toc.py
-- Extracts the Table of Contents from the PDF.
-- Identifies section numbers, titles, hierarchy (level), and page numbers using regex patterns.
-- Exports structured output to usb_pd_toc.jsonl.
-2. extract_sections.py
-- Parses all sections from the PDF body.
-- Preserves section numbering, titles, and hierarchy.
-- Saves results to usb_pd_spec.jsonl.
-3. extract_metadata.py
-- Extracts and stores document metadata such as title, revision, and total section count.
-- Outputs usb_pd_metadata.json.
-4. validate_sections.py
-- Compares parsed sections against the Table of Contents.
-- Detects missing sections, ordering errors, and page mismatches.
-- Generates validation_report.xlsx for detailed analysis.
+This project is divided into modular components for clarity and maintainability:
+- Parser Module:
+    1. extract_toc.py
+    - Extracts the Table of Contents from the PDF.
+    - Identifies section numbers, titles, hierarchy (level), and page numbers using regex patterns.
+    - Exports structured output to usb_pd_toc.jsonl.
+    2. section_extractor.py
+    - Parses all main content sections from the PDF body.
+    - Preserves section numbering, titles, and hierarchy structure.
+    - Saves extracted sections to usb_pd_spec.jsonl.
+    3. metadata_extractor.py
+    - Extracts and stores document metadata (e.g. title, revision, total section count).
+    - Outputs usb_pd_metadata.json.
+- Validator Module
+    1. section_validate.py
+    - Compares parsed section data against the ToC.
+    - Detects missing sections, ordering errors, and page mismatches.
+    - Generates validation_report.xlsx for detailed analysis.
 
 ## Author
 Dhana Varshini S  
