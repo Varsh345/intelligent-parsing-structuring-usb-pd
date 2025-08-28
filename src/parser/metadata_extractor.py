@@ -86,8 +86,6 @@ class MetadataExtractor:
         if missing:
             logging.warning(f"Metadata is missing fields: {missing}")
 
-# Assuming MetadataExtractor class code is implemented above
-
 if __name__ == "__main__":
     PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
     PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
@@ -97,9 +95,6 @@ if __name__ == "__main__":
     metadata = extractor.extract()
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Writing metadata to: {OUTPUT_FILE.resolve()}")
-
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
-
     print("Metadata extraction complete.")

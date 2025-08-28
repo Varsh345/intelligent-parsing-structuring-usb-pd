@@ -3,103 +3,125 @@ import json
 import re
 from pathlib import Path
 from typing import List, Dict, Optional
+import spacy
+from spacy.matcher import PhraseMatcher
 
 
 class USBPDSpecExtractor:
     """
-    Extracts sections from a USB PD specification PDF based on TOC entries,
-    cleans titles, assigns tags, and saves structured JSONL output.
+    Extract sections from USB PD PDF, clean titles, assign tags using SpaCy PhraseMatcher,
+    and save structured JSONL output.
     """
-
-    def __init__(self, pdf_path: Path, toc_file: Path, output_file: Path, tag_map: Optional[Dict[str, List[str]]] = None):
-        """
-        Initialize the extractor.
-
-        Args:
-            pdf_path (Path): Path to USB PD PDF.
-            toc_file (Path): Path to TOC JSONL.
-            output_file (Path): Path for saving extracted sections JSONL.
-            tag_map (Optional[Dict[str, List[str]]]): Mapping of semantic tags to keywords.
-        """
+    def __init__(
+        self,
+        pdf_path: Path,
+        toc_file: Path,
+        output_file: Path,
+        tag_map: Optional[Dict[str, List[str]]] = None,
+        spacy_model: str = "en_core_web_sm",
+    ):
         self.pdf_path = pdf_path
         self.toc_file = toc_file
         self.output_file = output_file
         self.tag_map = tag_map or {}
 
+        # Load SpaCy NLP pipeline
+        self.nlp = spacy.load(spacy_model)
+        self.nlp.max_length = 5_000_000
+        self.matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
+        self._prepare_matcher()
+
         # Ensure output directory exists
         self.output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    @staticmethod
-    def load_toc(toc_file: Path) -> List[Dict]:
+    def _prepare_matcher(self):
+        """Prepare PhraseMatcher patterns for all tags from tag_map keywords."""
+        for tag, keywords in self.tag_map.items():
+            patterns = [self.nlp.make_doc(keyword) for keyword in keywords]
+            self.matcher.add(tag, patterns)
+
+    def load_toc(self) -> List[Dict]:
         """Load TOC entries from JSONL file."""
-        with toc_file.open("r", encoding="utf-8") as f:
-            return [json.loads(line) for line in f]
+        try:
+            with self.toc_file.open("r", encoding="utf-8") as f:
+                return [json.loads(line) for line in f]
+        except Exception as e:
+            print(f"Error loading TOC: {e}")
+            return []
 
     @staticmethod
     def clean_title(title: str) -> str:
-        """Clean section title by removing extra dots and whitespace."""
-        title = re.sub(r'\.{2,}', '', title)
-        title = re.sub(r'\s+', ' ', title)
+        title = re.sub(r"\.{2,}", "", title)
+        title = re.sub(r"\s+", " ", title)
         return title.strip()
 
+    def assign_tags(self, text: str) -> List[str]:
+        """
+        Assign tags by matching tag keywords/phrases using SpaCy PhraseMatcher.
+        Arguments: text - Text to search for tag keywords.
+        Returns: List - List of matched tags.
+        """
+        doc = self.nlp(text)
+        matches = self.matcher(doc)
+        matched_tags = {self.nlp.vocab.strings[match_id] for match_id, start, end in matches}
+        return sorted(matched_tags)
+
     def extract_sections(self, toc_entries: List[Dict]) -> List[Dict]:
-        """
-        Extract sections from PDF using TOC, clean titles, and assign tags.
+        sections = []
+        try:
+            with pdfplumber.open(self.pdf_path) as pdf:
+                total_pages = len(pdf.pages)
+                total_sections = len(toc_entries)
 
-        Args:
-            toc_entries (List[Dict]): TOC entries loaded from JSONL.
+                for idx, entry in enumerate(toc_entries):
+                    start_page = max(entry.get("page", 1) - 1, 0)
+                    next_page = toc_entries[idx + 1]["page"] - 1 if (idx + 1) < total_sections else total_pages
+                    end_page = max(start_page, min(next_page - 1, total_pages - 1))
 
-        Returns:
-            List[Dict]: List of sections with cleaned titles, full_path, and tags.
-        """
-        sections: List[Dict] = []
+                    pages_text = (pdf.pages[p].extract_text() or "" for p in range(start_page, end_page + 1))
+                    section_text = "\n".join(pages_text).strip()
 
-        with pdfplumber.open(self.pdf_path) as pdf:
-            total_pages = len(pdf.pages)
-            total_sections = len(toc_entries)
+                    clean_title = self.clean_title(entry.get("title", ""))
 
-            for idx, entry in enumerate(toc_entries):
-                start_page = max(entry["page"] - 1, 0)
-                end_page = toc_entries[idx + 1]["page"] - 2 if idx + 1 < total_sections else total_pages - 1
-                end_page = max(start_page, min(end_page, total_pages - 1))
+                    combined_text = f"{clean_title} {section_text}"
+                    tags = self.assign_tags(combined_text)
 
-                # Extract all page text efficiently
-                section_text = "\n".join(
-                    pdf.pages[p].extract_text() or "" for p in range(start_page, end_page + 1)
-                ).lower()
-
-                # Assign tags based on presence of keywords
-                tags = [tag for tag, keywords in self.tag_map.items() if any(kw in section_text for kw in keywords)]
-
-                clean_title = self.clean_title(entry["title"])
-                sections.append({
-                    **entry,
-                    "title": clean_title,
-                    "full_path": f"{entry['section_id']} {clean_title}",
-                    "tags": tags
-                })
+                    sections.append({
+                        **entry,
+                        "title": clean_title,
+                        "full_path": f"{entry.get('section_id', '')} {clean_title}",
+                        "tags": tags
+                    })
+        except Exception as e:
+            print(f"Error extracting sections: {e}")
 
         return sections
 
     def save_jsonl(self, sections: List[Dict]):
-        """Save extracted sections to JSONL file."""
-        with self.output_file.open("w", encoding="utf-8") as f:
-            for section in sections:
-                f.write(json.dumps(section, ensure_ascii=False) + "\n")
+        try:
+            with self.output_file.open("w", encoding="utf-8") as f:
+                for section in sections:
+                    f.write(json.dumps(section, ensure_ascii=False) + "\n")
+        except Exception as e:
+            print(f"Error saving JSONL: {e}")
 
     def run(self):
-        """Main method to execute extraction and save JSONL."""
-        toc_entries = self.load_toc(self.toc_file)
+        toc_entries = self.load_toc()
+        if not toc_entries:
+            print("No TOC entries loaded.")
+            return
         sections = self.extract_sections(toc_entries)
-        self.save_jsonl(sections)
-        print(f"Sections extracted and saved: {len(sections)}")
-
+        if sections:
+            self.save_jsonl(sections)
+            print(f"Sections extraction complete.")
+        else:
+            print("No sections extracted.")
 
 if __name__ == "__main__":
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
     PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
     TOC_FILE = PROJECT_ROOT / "output" / "usb_pd_toc.jsonl"
-    OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_spect.jsonl"
+    OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_spec.jsonl"
 
     TAG_MAP = {
         "contracts": ["contract", "operational contract", "negotiation"],
@@ -109,8 +131,8 @@ if __name__ == "__main__":
         "pps": ["programmable power supply", "pps"],
         "avs": ["adjustable voltage supply", "avs"],
         "usb4": ["usb4"],
-        "charging": ["charge", "charging", "battery"],
-        "hub": ["hub", "hubs"]
+        "charging": ["charge", "charging", "battery", "power", "energy"],
+        "hub": ["hub", "hubs", "pdusb", "peripheral", "switch", "device"]
     }
 
     extractor = USBPDSpecExtractor(PDF_PATH, TOC_FILE, OUTPUT_FILE, TAG_MAP)

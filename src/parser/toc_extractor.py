@@ -5,12 +5,9 @@ import json
 from typing import List, Optional, Generator
 from dataclasses import dataclass, asdict
 
-
 @dataclass
 class TOCEntry:
-    """
-    Represents a single TOC section.
-    """
+    """ Represents a single TOC section. """
     doc_title: str
     section_id: str
     title: str
@@ -19,22 +16,15 @@ class TOCEntry:
     parent_id: Optional[str]
     full_path: str
 
-
 class PDFReader:
-    """
-    Reads text lines from a PDF efficiently using pdfplumber.
-    """
-
+    """ Reads text lines from a PDF efficiently using pdfplumber. """
     def __init__(self, pdf_path: Path):
         self.pdf_path = pdf_path
 
     def extract_lines(self, start_page: int = 1, end_page: Optional[int] = None) -> Generator[str, None, None]:
         """
         Extract lines of text from the PDF pages.
-
-        Args:
-            start_page: 1-based start page.
-            end_page: 1-based end page.
+        Arguments: start_page, end_page(1-based end page).
         """
         try:
             with pdfplumber.open(self.pdf_path) as pdf:
@@ -53,9 +43,7 @@ class PDFReader:
             return
 
 class TOCParser:
-    """
-    Parses PDF lines into structured TOC entries.
-    """
+    """ Parses PDF lines into structured TOC entries. """
     TOC_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s+(.+?)\s+(\d+)$", re.UNICODE)
 
     def __init__(self, doc_title: str):
@@ -64,8 +52,8 @@ class TOCParser:
     @staticmethod
     def clean_line(line: str) -> str:
         """
-        Clean PDF line: remove 'PageXX' artifacts and extra spacing.
-        Args:- line: Raw PDF line.
+        Clean PDF line: remove artifacts and extra spacing.
+        Arguments: line:- Raw PDF line.
         Returns: Cleaned line.
         """
         line = line.replace("…", " ")
@@ -77,7 +65,7 @@ class TOCParser:
     def clean_title(title: str) -> str:
         """
         Fix garbled titles, remove extra dots/spaces.
-        Args: Raw title string.
+        Arguments: Raw title string.
         Returns: Clean title.
         """
         title = re.sub(r'[\s.]+', ' ', title).strip()
@@ -87,13 +75,10 @@ class TOCParser:
     def parse_lines(self, lines: List[str]) -> List[TOCEntry]:
         """
         Parse cleaned lines into TOCEntry objects.
-
-        Args: List of PDF text lines.
-
+        Arguments: List of PDF text lines.
         Returns: Parsed TOC entries.
         """
         entries: List[TOCEntry] = []
-
         for line in lines:
             normalized = self.clean_line(line)
             match = self.TOC_PATTERN.match(normalized)
@@ -116,14 +101,12 @@ class TOCParser:
                     full_path=f"{section_id} {clean_title}"
                 )
             )
-
         return entries
-
+    
 def save_jsonl(entries: List[TOCEntry], output_file: Path):
     """
     Save TOC entries as JSONL.
-
-    Args:
+    Arguments:
         entries: TOC entries.
         output_file: Output file path.
     """
@@ -133,7 +116,7 @@ def save_jsonl(entries: List[TOCEntry], output_file: Path):
             f.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")
 
 if __name__ == "__main__":
-    # --- Paths ---
+    #Paths
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
     PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
     OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_toc.jsonl"
@@ -152,4 +135,4 @@ if __name__ == "__main__":
 
     #Save JSONL
     save_jsonl(toc_entries, OUTPUT_FILE)
-
+    print("TOC extraction complete.")
