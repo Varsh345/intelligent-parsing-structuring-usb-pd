@@ -7,7 +7,7 @@ class TestMetadataExtractor(unittest.TestCase):
     """Simple unit tests for MetadataExtractor class."""
 
     def setUp(self):
-        self.existing_pdf_path = Path("data/USB_PD_R3_2 V1_1_2024_10.pdf")  # adjust if needed
+        self.existing_pdf_path = Path("data/USB_PD_R3_2 V1_1_2024_10.pdf")
         self.nonexistent_pdf_path = Path("data/non_existent.pdf")
         self.doc_title = "USB PD Spec Test"
 

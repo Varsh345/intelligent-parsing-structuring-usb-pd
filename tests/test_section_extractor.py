@@ -1,6 +1,6 @@
 import unittest
 from pathlib import Path
-from src.parser.section_extractor import USBPDSpecExtractor  # adjust import if needed
+from src.parser.section_extractor import USBPDSpecExtractor  
 
 
 class TestUSBPDSpecExtractor(unittest.TestCase):
