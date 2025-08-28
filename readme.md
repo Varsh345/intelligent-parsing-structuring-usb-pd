@@ -18,21 +18,6 @@ It extracts the Table of Contents (ToC), processes all document sections into st
 - Validates parsed data against the ToC for missing/mismatched sections, order errors, and page discrepancies.
 - Exports results in JSONL, JSON, and Excel formats.
 
-## Project Structure
-
-USB_PD_PARSERS/
-├── app.py                    # Main entry point to run parsing and validation
-├── data/                     # Place USB PD Specification PDF here
-├── output/                   # Outputs: JSON, JSONL, Excel files
-├── src/
-│   ├── parser/               # Parsing modules for metadata, sections, ToC
-│   ├── validator/            # Validation modules for section consistency
-│   └── __init__.py
-├── tests/                    # Unit tests using unittest framework
-├── requirements.txt          # Python dependencies
-├── readme.md                 # Project documentation
-└── .gitignore
-
 ## Installation & Setup
 1. Clone the repository and navigate to the project folder.
 2. Place the USB PD Specification PDF in the `data/` directory.
