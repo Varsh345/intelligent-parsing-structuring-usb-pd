@@ -1,138 +1,132 @@
-from pathlib import Path
 import re
-import pdfplumber
 import json
-from typing import List, Optional, Generator
-from dataclasses import dataclass, asdict
+from pathlib import Path
+from PyPDF2 import PdfReader
 
-@dataclass
-class TOCEntry:
-    """ Represents a single TOC section. """
-    doc_title: str
-    section_id: str
-    title: str
-    page: int
-    level: int
-    parent_id: Optional[str]
-    full_path: str
 
-class PDFReader:
-    """ Reads text lines from a PDF efficiently using pdfplumber. """
-    def __init__(self, pdf_path: Path):
-        self.pdf_path = pdf_path
+class TOCExtractor:
+    """
+    Extract Table of Contents (TOC) sections from a PDF file.
+    """
 
-    def extract_lines(self, start_page: int = 1, end_page: Optional[int] = None) -> Generator[str, None, None]:
+    TOC_REGEX = re.compile(r"^(\d+(?:\.\d+)*)(?:\s+)(.+?)\s*(\d+)?$")
+
+    def __init__(self, pdf_path, start_page, end_page,
+                 doc_title="USB PD Specification Rev X"):
         """
-        Extract lines of text from the PDF pages.
-        Arguments: start_page, end_page(1-based end page).
+        Initialize TOCExtractor.
+
+        Arguments:
+            pdf_path: Path to the PDF file.
+            start_page: Starting page number (1-based).
+            end_page: Ending page number (inclusive).
+            doc_title: Document title metadata.
         """
-        try:
-            with pdfplumber.open(self.pdf_path) as pdf:
-                pages = pdf.pages[start_page - 1:end_page]
-                for page in pages:
-                    text = page.extract_text() or ""
-                    for line in text.split("\n"):
-                        line = line.strip()
-                        if line:
-                            yield line
-        except FileNotFoundError:
-            print(f"Error: PDF file not found at path {self.pdf_path}")
-            return
-        except Exception as e:
-            print(f"Error reading PDF file: {e}")
-            return
-
-class TOCParser:
-    """ Parses PDF lines into structured TOC entries. """
-    TOC_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s+(.+?)\s+(\d+)$", re.UNICODE)
-
-    def __init__(self, doc_title: str):
+        self.pdf_path = Path(pdf_path)
+        self.start_page = start_page
+        self.end_page = end_page
         self.doc_title = doc_title
+        self.toc_sections = []
 
-    @staticmethod
-    def clean_line(line: str) -> str:
+    def extract(self):
         """
-        Clean PDF line: remove artifacts and extra spacing.
-        Arguments: line:- Raw PDF line.
-        Returns: Cleaned line.
-        """
-        line = line.replace("…", " ")
-        line = re.sub(r'\s*P\s*a\s*g\s*e\s*\d+', '', line, flags=re.IGNORECASE)
-        line = re.sub(r'\s+', ' ', line).strip()
-        return line
+        Extract TOC sections from the PDF file.
 
-    @staticmethod
-    def clean_title(title: str) -> str:
+        Returns:
+            list[dict]: Extracted TOC section entries.
         """
-        Fix garbled titles, remove extra dots/spaces.
-        Arguments: Raw title string.
-        Returns: Clean title.
-        """
-        title = re.sub(r'[\s.]+', ' ', title).strip()
-        title = re.sub(r'\b(\w)\s(?=\w\b)', r'\1', title) 
-        return title
-
-    def parse_lines(self, lines: List[str]) -> List[TOCEntry]:
-        """
-        Parse cleaned lines into TOCEntry objects.
-        Arguments: List of PDF text lines.
-        Returns: Parsed TOC entries.
-        """
-        entries: List[TOCEntry] = []
-        for line in lines:
-            normalized = self.clean_line(line)
-            match = self.TOC_PATTERN.match(normalized)
-            if not match:
-                continue
-
-            section_id, title, page_str = match.groups()
-            clean_title = self.clean_title(title)
-            parts = section_id.split(".")
-            parent_id = ".".join(parts[:-1]) if len(parts) > 1 else None
-
-            entries.append(
-                TOCEntry(
-                    doc_title=self.doc_title,
-                    section_id=section_id,
-                    title=clean_title,
-                    page=int(page_str),
-                    level=len(parts),
-                    parent_id=parent_id,
-                    full_path=f"{section_id} {clean_title}"
-                )
+        if not self.pdf_path.exists():
+            raise FileNotFoundError(
+                f"PDF file not found: {self.pdf_path}"
             )
-        return entries
-    
-def save_jsonl(entries: List[TOCEntry], output_file: Path):
-    """
-    Save TOC entries as JSONL.
-    Arguments:
-        entries: TOC entries.
-        output_file: Output file path.
-    """
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    with output_file.open("w", encoding="utf-8") as f:
-        for entry in entries:
-            f.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")
+
+        reader = PdfReader(str(self.pdf_path))
+        num_pages = len(reader.pages)
+
+        if self.start_page < 1 or self.end_page > num_pages:
+            raise ValueError(
+                f"Page range ({self.start_page}-{self.end_page}) "
+                f"out of bounds for {num_pages} pages."
+            )
+
+        for page_num in range(self.start_page - 1, self.end_page):
+            page = reader.pages[page_num]
+            text = page.extract_text() or ""
+            for line in text.splitlines():
+                self._process_line(line.strip())
+
+        self._sort_toc_sections()
+        return self.toc_sections
+
+    def _process_line(self, line):
+        """Process a single line of text to extract TOC info."""
+        if not line:
+            return
+
+        match = self.TOC_REGEX.match(line)
+        if not match:
+            return
+
+        section_id = match.group(1)
+        title = match.group(2).strip()
+        title = re.sub(r'(\s*\.\s*)+$', '', title)
+        if title.strip('.') == '':
+            title = ''
+
+        page_number = int(match.group(3)) if match.group(3) else -1
+        level = section_id.count('.') + 1
+        parent_id = '.'.join(section_id.split('.')[:-1]) if level > 1 else None
+        full_path = f"{section_id} {title}".strip()
+        full_path = re.sub(r'(\s*\.\s*)+$', '', full_path)
+
+        self.toc_sections.append(
+            {
+                "doc_title": self.doc_title,
+                "section_id": section_id,
+                "title": title,
+                "page": page_number,
+                "level": level,
+                "parent_id": parent_id,
+                "full_path": full_path,
+            }
+        )
+
+    def _sort_toc_sections(self):
+        """Sort TOC sections by hierarchical section IDs."""
+
+        def section_id_key(sid):
+            return [int(x) for x in sid.split('.')]
+
+        self.toc_sections.sort(key=lambda x: section_id_key(x['section_id']))
+
+    def save_jsonl(self, output_path):
+        """
+        Save extracted TOC sections to a JSONL file.
+
+        Arguments:
+            output_path: Output file path.
+        """
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_path, 'w', encoding="utf-8") as f:
+            for item in self.toc_sections:
+                f.write(json.dumps(item) + '\n')
+
+        print(f"TOC extraction completed")
+
 
 if __name__ == "__main__":
-    #Paths
-    PROJECT_ROOT = Path(__file__).resolve().parents[2]
-    PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
-    OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_toc.jsonl"
+    pdf_file_path = (
+        r"D:\.@PLACEMENT\usb_pd_parsers\data\USB_PD_R3_2 V1_1_2024_10.pdf"
+    )
+    start_page = 13
+    end_page = 18
 
-    #TOC page range
-    TOC_START_PAGE = 13
-    TOC_END_PAGE = 26
+    extractor = TOCExtractor(pdf_file_path, start_page, end_page)
 
-    #Read only TOC pages
-    pdf_reader = PDFReader(PDF_PATH)
-    toc_lines = list(pdf_reader.extract_lines(start_page=TOC_START_PAGE, end_page=TOC_END_PAGE))
-
-    #Parse TOC entries
-    toc_parser = TOCParser("USB Power Delivery Specification Rev 3.2 V1.1 2024-10")
-    toc_entries = toc_parser.parse_lines(toc_lines)
-
-    #Save JSONL
-    save_jsonl(toc_entries, OUTPUT_FILE)
-    print("TOC extraction complete.")
+    try:
+        toc = extractor.extract()
+        extractor.save_jsonl("output/usb_pd_toc.jsonl")
+    except (FileNotFoundError, ValueError) as err:
+        print(f"Error: {err}")
