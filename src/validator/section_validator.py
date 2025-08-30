@@ -124,7 +124,7 @@ class SectionValidator:
 
         try:
             wb.save(self.output_file)
-            logging.info(f"Validation report saved successfully: {self.output_file}")
+            logging.info(f"Validation report saved successfully.")
         except Exception as e:
             logging.error(f"Failed to save validation report: {e}")
 
