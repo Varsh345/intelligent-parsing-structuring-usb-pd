@@ -36,8 +36,7 @@ class TOCExtractor:
 class TagAssigner:
     """Assigns semantic tags to text using SpaCy PhraseMatcher."""
 
-    def __init__(self, tag_map: Dict[str, List[str]],
-                 model: str = "en_core_web_sm"):
+    def __init__(self, tag_map: Dict[str, List[str]], model: str = "en_core_web_sm"):
         self.nlp = spacy.load(model)
         self.nlp.max_length = 5_000_000
         self.matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
@@ -84,19 +83,21 @@ class SectionExtractor:
                 else:
                     end = total_pages - 1
 
-                section_text = " ".join(pages[start:end + 1])
+                section_text = " ".join(pages[start : end + 1])
                 tags = self.tagger.assign(section_text)
-                sections.append({
-                    "doc_title": self.doc_title,
-                    "section_id": entry.get("section_id", ""),
-                    "title": TOCExtractor.clean_title(entry.get("title", "")),
-                    "page": start + 1,
-                    "level": entry.get("level", 1),
-                    "parent_id": entry.get("parent_id"),
-                    "full_path": entry.get("full_path", ""),
-                    "tags": tags,
-                    "type": "section",
-                })
+                sections.append(
+                    {
+                        "doc_title": self.doc_title,
+                        "section_id": entry.get("section_id", ""),
+                        "title": TOCExtractor.clean_title(entry.get("title", "")),
+                        "page": start + 1,
+                        "level": entry.get("level", 1),
+                        "parent_id": entry.get("parent_id"),
+                        "full_path": entry.get("full_path", ""),
+                        "tags": tags,
+                        "type": "section",
+                    }
+                )
 
             sections.extend(self._extract_lists(pages))
         return sections
@@ -104,23 +105,28 @@ class SectionExtractor:
     def _extract_lists(self, pages: List[str]) -> List[Dict]:
         """Extract LOF/LOT sections if present."""
         results = []
-        for list_type, list_title in [("lof", "List of Figures"),
-                                      ("lot", "List of Tables")]:
+        for list_type, list_title in [
+            ("lof", "List of Figures"),
+            ("lot", "List of Tables"),
+        ]:
             section = self._extract_list_section(pages, list_title)
             if section:
-                section.update({
-                    "doc_title": self.doc_title,
-                    "section_id": list_type,
-                    "level": 1,
-                    "parent_id": None,
-                    "full_path": list_title,
-                    "type": list_type,
-                })
+                section.update(
+                    {
+                        "doc_title": self.doc_title,
+                        "section_id": list_type,
+                        "level": 1,
+                        "parent_id": None,
+                        "full_path": list_title,
+                        "type": list_type,
+                    }
+                )
                 results.append(section)
         return results
 
-    def _extract_list_section(self, pages: List[str],
-                              section_title: str) -> Optional[Dict]:
+    def _extract_list_section(
+        self, pages: List[str], section_title: str
+    ) -> Optional[Dict]:
         """Extract block of text for LOF/LOT."""
         search_title = section_title.lower()
         found_page = None
@@ -135,8 +141,7 @@ class SectionExtractor:
         collected = []
         for p in range(found_page, len(pages)):
             lines = pages[p].splitlines()
-            if p > found_page and any(line.isupper() and len(line) > 5
-                                      for line in lines[:3]):
+            if p > found_page and any(line.isupper() and len(line) > 5 for line in lines[:3]):
                 break
             collected.append(pages[p])
 
@@ -164,8 +169,7 @@ class Exporter:
             with self.output_file.open("w", encoding="utf-8") as f:
                 for sec in sections:
                     f.write(json.dumps(sec, ensure_ascii=False) + "\n")
-            logging.info("Saved %d sections to %s",
-                         len(sections), self.output_file)
+            logging.info("Saved %d sections to %s", len(sections), self.output_file)
         except Exception as e:
             logging.error("Error saving JSONL: %s", e)
 
@@ -173,14 +177,17 @@ class Exporter:
 class ExtractionPipeline:
     """Coordinates the full extraction process."""
 
-    def __init__(self, pdf_path: Path, toc_file: Path,
-                 output_file: Path, doc_title: str,
-                 tag_map: Dict[str, List[str]]):
+    def __init__(
+        self,
+        pdf_path: Path,
+        toc_file: Path,
+        output_file: Path,
+        doc_title: str,
+        tag_map: Dict[str, List[str]],
+    ):
         self.toc_extractor = TOCExtractor(toc_file)
         self.tagger = TagAssigner(tag_map)
-        self.section_extractor = SectionExtractor(pdf_path,
-                                                 self.tagger,
-                                                 doc_title)
+        self.section_extractor = SectionExtractor(pdf_path, self.tagger, doc_title)
         self.exporter = Exporter(output_file)
 
     def run(self) -> None:
