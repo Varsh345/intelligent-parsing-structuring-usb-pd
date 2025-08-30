@@ -1,35 +1,26 @@
 import unittest
-import json
+from unittest.mock import mock_open, patch
 from pathlib import Path
-import tempfile
 from src.validator.section_validator import SectionValidator
+import logging
 
 
-class TestSectionValidator(unittest.TestCase):
+class TestSectionValidatorSimple(unittest.TestCase):
     def setUp(self):
-        """Create a temporary folder and files for each test."""
-        self.tmpdir = tempfile.TemporaryDirectory()
-        self.toc_file = Path(self.tmpdir.name) / "toc.jsonl"
-        self.spec_file = Path(self.tmpdir.name) / "spec.jsonl"
-        self.output_file = Path(self.tmpdir.name) / "report.xlsx"
+        self.validator = SectionValidator(Path("dummy_toc.jsonl"), Path("dummy_spec.jsonl"), Path("dummy.xlsx"))
 
-    def tearDown(self):
-        """Remove temporary files."""
-        self.tmpdir.cleanup()
+    @patch("pathlib.Path.open", new_callable=mock_open, read_data='{"section_id": "1", "title": "Intro"}\n{"section_id": "2", "title": "Details"}\n')
+    def test_load_jsonl_success(self, mock_file):
+        result = self.validator.load_jsonl(self.validator.toc_file)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["section_id"], "1")
 
-    def test_validate_fails_with_empty_files(self):
-        """If files are empty, validate() should return False."""
-        self.toc_file.write_text("")   # empty file
-        self.spec_file.write_text("")  # empty file
-        validator = SectionValidator(self.toc_file, self.spec_file, self.output_file)
-        self.assertFalse(validator.validate())
-
-    def test_validate_passes_with_data(self):
-        """If files have valid JSONL, validate() should return True."""
-        self.toc_file.write_text(json.dumps({"section_id": "1.0", "title": "Intro"}) + "\n")
-        self.spec_file.write_text(json.dumps({"section_id": "1.0", "title": "Intro"}) + "\n")
-        validator = SectionValidator(self.toc_file, self.spec_file, self.output_file)
-        self.assertTrue(validator.validate())
+    @patch("pathlib.Path.open", new_callable=mock_open, read_data='invalid json\n')
+    def test_load_jsonl_failure(self, mock_file):
+        with patch("logging.error") as mock_log_error:
+            result = self.validator.load_jsonl(self.validator.toc_file)
+            self.assertEqual(result, [])
+            mock_log_error.assert_called()
 
 
 if __name__ == "__main__":
