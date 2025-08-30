@@ -1,8 +1,7 @@
 import unittest
 from pathlib import Path
 
-from src.parser.section_extractor import SectionExtractor, TOCExtractor   # replace with actual filename
-
+from src.parser.section_extractor import SectionExtractor, TOCExtractor 
 
 class DummyTagger:
     """Simple dummy tagger to avoid SpaCy dependency in tests."""
