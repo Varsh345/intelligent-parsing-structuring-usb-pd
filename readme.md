@@ -40,14 +40,14 @@ This project is divided into modular components for clarity and maintainability:
     1. extract_toc.py
     - Extracts the Table of Contents from the PDF.
     - Identifies section numbers, titles, hierarchy (level), and page numbers using regex patterns.
-    - Exports structured output to usb_pd_toc.jsonl.
+    - Exports structured output to usb_pd_toc.json.
     2. section_extractor.py
     - Parses all main content sections from the PDF body.
     - Preserves section numbering, titles, and hierarchy structure.
     - Saves extracted sections to usb_pd_spec.jsonl.
     3. metadata_extractor.py
     - Extracts and stores document metadata (e.g. title, revision, total section count).
-    - Outputs usb_pd_metadata.json.
+    - Outputs usb_pd_metadata.jsonl.
 - Validator Module
     1. section_validate.py
     - Compares parsed section data against the ToC.
