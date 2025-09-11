@@ -17,12 +17,15 @@ class SectionValidator:
         self.toc_entries = []
         self.spec_entries = []
 
-    def load_jsonl(self, path: Path) -> List[Dict]:
+    def load_json(self, path: Path) -> list:
         try:
             with path.open(encoding="utf-8") as f:
-                return [json.loads(line) for line in f if line.strip()]
+                if path.suffix.lower() == ".json":
+                    return json.load(f)
+                else:
+                    return [json.loads(line) for line in f if line.strip()]
         except Exception as e:
-            logging.error(f"Error loading JSONL from {path}: {e}")
+            logging.error(f"Error loading {path}: {e}")
             return []
 
     def validate(self):
@@ -31,8 +34,8 @@ class SectionValidator:
         Returns: bool - True if both TOC and Spec entries are loaded successfully and non-empty,
                         False otherwise.
         """
-        self.toc_entries = self.load_jsonl(self.toc_file)
-        self.spec_entries = self.load_jsonl(self.spec_file)
+        self.toc_entries = self.load_json(self.toc_file)
+        self.spec_entries = self.load_json(self.spec_file)
 
         if not self.toc_entries or not self.spec_entries:
             logging.error("Empty TOC or Spec input; cannot generate validation report.")
@@ -137,7 +140,7 @@ from pathlib import Path
 
 if __name__ == "__main__":
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
-    toc_path = PROJECT_ROOT / "output" / "usb_pd_toc.jsonl"
+    toc_path = PROJECT_ROOT / "output" / "usb_pd_toc.json"
     spec_path = PROJECT_ROOT / "output" / "usb_pd_spec.jsonl"
     output_path = PROJECT_ROOT / "output" / "validation_report.xlsx"
 

@@ -24,15 +24,14 @@ def main():
     # Step 1: Extract Metadata
     meta_extractor = MetadataExtractor(PDF_PATH, DOC_TITLE)
     metadata = meta_extractor.extract()
-    with open(OUTPUT_DIR / "usb_pd_metadata.json", "w", encoding="utf-8") as f:
+    with open(OUTPUT_DIR / "usb_pd_metadata.jsonl", "w", encoding="utf-8") as f:
         f.write(json.dumps(metadata) + "\n")
 
     # Step 2: Extract TOC 
     toc_extractor = TOCExtractor(PDF_PATH, start_page=13, end_page=18, doc_title=DOC_TITLE)
     toc_entries = toc_extractor.extract()
-    with open(OUTPUT_DIR / "usb_pd_toc.jsonl", "w", encoding="utf-8") as f:
-        for entry in toc_entries:
-            f.write(json.dumps(entry) + "\n")
+    with open(OUTPUT_DIR / "usb_pd_toc.json", "w", encoding="utf-8") as f:
+        json.dump(toc_entries, f, indent=2, ensure_ascii=False)
 
     # Step 3: Extract Spec Sections based on TOC entries
     tagger = TagAssigner(tag_map)
@@ -45,7 +44,7 @@ def main():
     print("Metadata, TOC, and Section extraction completed.")
 
     # Step 4: Validate and generate XLSX report
-    toc_file = OUTPUT_DIR / "usb_pd_toc.jsonl"
+    toc_file = OUTPUT_DIR / "usb_pd_toc.json"
     spec_file = OUTPUT_DIR / "usb_pd_spec.jsonl"
     validation_report = OUTPUT_DIR / "validation_report.xlsx"
     validator = SectionValidator(toc_file, spec_file, validation_report)

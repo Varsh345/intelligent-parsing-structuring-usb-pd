@@ -7,6 +7,7 @@ import pdfplumber
 import spacy
 from spacy.matcher import PhraseMatcher
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class TOCExtractor:
     """Handles loading and cleaning of TOC entries from JSONL."""
@@ -14,11 +15,11 @@ class TOCExtractor:
     def __init__(self, toc_file: Path):
         self.toc_file = toc_file
 
-    def load(self) -> List[Dict]:
-        """Load TOC entries from JSONL file."""
+    def load(self) -> list[dict]:
+        """Load TOC entries from JSON file."""
         try:
             with self.toc_file.open("r", encoding="utf-8") as f:
-                entries = [json.loads(line) for line in f]
+                entries = json.load(f)
             logging.info("Loaded %d TOC entries.", len(entries))
             return entries
         except Exception as e:
@@ -94,67 +95,11 @@ class SectionExtractor:
                         "level": entry.get("level", 1),
                         "parent_id": entry.get("parent_id"),
                         "full_path": entry.get("full_path", ""),
-                        "tags": tags,
-                        "type": "section",
+                        "tags": tags
                     }
                 )
 
-            sections.extend(self._extract_lists(pages))
-        return sections
-
-    def _extract_lists(self, pages: List[str]) -> List[Dict]:
-        """Extract LOF/LOT sections if present."""
-        results = []
-        for list_type, list_title in [
-            ("lof", "List of Figures"),
-            ("lot", "List of Tables"),
-        ]:
-            section = self._extract_list_section(pages, list_title)
-            if section:
-                section.update(
-                    {
-                        "doc_title": self.doc_title,
-                        "section_id": list_type,
-                        "level": 1,
-                        "parent_id": None,
-                        "full_path": list_title,
-                        "type": list_type,
-                    }
-                )
-                results.append(section)
-        return results
-
-    def _extract_list_section(
-        self, pages: List[str], section_title: str
-    ) -> Optional[Dict]:
-        """Extract block of text for LOF/LOT."""
-        search_title = section_title.lower()
-        found_page = None
-        for i, text in enumerate(pages):
-            first_lines = "\n".join(text.splitlines()[:5]).lower()
-            if search_title in first_lines:
-                found_page = i
-                break
-        if found_page is None:
-            return None
-
-        collected = []
-        for p in range(found_page, len(pages)):
-            lines = pages[p].splitlines()
-            if p > found_page and any(line.isupper() and len(line) > 5 for line in lines[:3]):
-                break
-            collected.append(pages[p])
-
-        combined = "\n".join(collected).strip()
-        if not combined:
-            return None
-        tags = self.tagger.assign(combined)
-        return {
-            "title": TOCExtractor.clean_title(section_title),
-            "page": found_page + 1,
-            "tags": tags,
-        }
-
+        return sections   
 
 class Exporter:
     """Handles saving extracted data into JSONL format."""
@@ -207,7 +152,7 @@ class ExtractionPipeline:
 if __name__ == "__main__":
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
     PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
-    TOC_FILE = PROJECT_ROOT / "output" / "usb_pd_toc.jsonl"
+    TOC_FILE = PROJECT_ROOT / "output" / "usb_pd_toc.json"
     OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_spec.jsonl"
     DOC_TITLE = "USB Power Delivery Specification Rev X"
 
