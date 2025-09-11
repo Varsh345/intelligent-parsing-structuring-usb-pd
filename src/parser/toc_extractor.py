@@ -99,9 +99,9 @@ class TOCExtractor:
 
         self.toc_sections.sort(key=lambda x: section_id_key(x['section_id']))
 
-    def save_jsonl(self, output_path):
+    def save_json(self, output_path):
         """
-        Save extracted TOC sections to a JSONL file.
+        Save extracted TOC sections to a JSON file (array format).
 
         Arguments:
             output_path: Output file path.
@@ -110,10 +110,9 @@ class TOCExtractor:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(output_path, 'w', encoding="utf-8") as f:
-            for item in self.toc_sections:
-                f.write(json.dumps(item) + '\n')
+            json.dump(self.toc_sections, f, indent=2, ensure_ascii=False)
 
-        print(f"TOC extraction completed")
+        print("TOC extraction completed")
 
 
 if __name__ == "__main__":
@@ -127,6 +126,6 @@ if __name__ == "__main__":
 
     try:
         toc = extractor.extract()
-        extractor.save_jsonl("output/usb_pd_toc.jsonl")
+        extractor.save_json("output/usb_pd_toc.json")
     except (FileNotFoundError, ValueError) as err:
         print(f"Error: {err}")
