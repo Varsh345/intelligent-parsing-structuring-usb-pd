@@ -116,13 +116,14 @@ class TOCExtractor:
 
 
 if __name__ == "__main__":
-    pdf_file_path = (
-        r"D:\.@PLACEMENT\usb_pd_parsers\data\USB_PD_R3_2 V1_1_2024_10.pdf"
-    )
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
+    TOC_FILE = PROJECT_ROOT / "output" / "usb_pd_toc.json"
+    
     start_page = 13
     end_page = 18
 
-    extractor = TOCExtractor(pdf_file_path, start_page, end_page)
+    extractor = TOCExtractor(PDF_PATH, start_page, end_page)
 
     try:
         toc = extractor.extract()
