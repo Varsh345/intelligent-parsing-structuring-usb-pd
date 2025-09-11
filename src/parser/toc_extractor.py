@@ -112,7 +112,7 @@ class TOCExtractor:
         with open(output_path, 'w', encoding="utf-8") as f:
             json.dump(self.toc_sections, f, indent=2, ensure_ascii=False)
 
-        print("TOC extraction completed")
+        print("TOC extraction completed.")
 
 
 if __name__ == "__main__":
