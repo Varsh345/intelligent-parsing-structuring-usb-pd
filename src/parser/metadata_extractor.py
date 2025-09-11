@@ -118,7 +118,7 @@ class MetadataExtractor:
 if __name__ == "__main__":
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
     PDF_PATH = PROJECT_ROOT / "data" / "USB_PD_R3_2 V1_1_2024_10.pdf"
-    OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_metadata.json"
+    OUTPUT_FILE = PROJECT_ROOT / "output" / "usb_pd_metadata.jsonl"
 
     DOC_TITLE = (
         "USB Power Delivery Specification Rev 3.2 V1.1 2024-10"
@@ -129,6 +129,6 @@ if __name__ == "__main__":
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
+        f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
 
     print("Metadata extraction complete.")
